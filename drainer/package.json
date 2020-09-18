@@ -1,0 +1,17 @@
+{
+  "name": "eks_node_drainer",
+  "version": "1.0.0",
+  "description": "Lambda to drain a Kubernetes node from a LifeCycleEvent",
+  "main": "app.js",
+  "repository": "https://github.com/awslabs/aws-sam-cli/tree/develop/samcli/local/init/templates/cookiecutter-aws-sam-hello-nodejs",
+  "author": "Chris Williams",
+  "license": "MIT",
+  "scripts": {
+    "test": "mocha tests/unit/"
+  },
+  "dependencies": {
+    "aws4": "^1.10.1",
+    "kubernetes-client": "^9.0.0",
+    "p-retry": "^4.2.0"
+  }
+}

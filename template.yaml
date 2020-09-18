@@ -1,0 +1,73 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  eks-node-drainer
+
+  
+# More info about Globals: https://github.com/awslabs/serverless-application-model/blob/master/docs/globals.rst
+Globals:
+  Function:
+    Timeout: 900 # maximum of 15 minutes
+
+Resources:
+  EKSNodeDrainerFunction:
+    Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
+    Properties:
+      CodeUri: drainer/
+      Handler: app.lambdaHandler
+      Runtime: nodejs12.x
+      Role: !GetAtt EKSNodeDrainerExecutionRole.Arn
+      Events:
+        EKSNodeDrainer:
+          Type: CloudWatchEvent
+          Properties:
+            Pattern:
+              source:
+                - 'aws.autoscaling'
+              detail-type:
+                - 'EC2 Instance-terminate Lifecycle Action'
+
+  EKSNodeDrainerExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: EKSNodeDrainerExecutionRole
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - lambda.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      Path: "/"
+
+  EKSNodeDrainerExecutionPolicy:
+    DependsOn:
+    - EKSNodeDrainerExecutionRole
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: EKSNodeDrainerRolePolicy
+      Roles:
+      - !Ref EKSNodeDrainerExecutionRole
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+              - logs:CreateLogGroup
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+            Resource: "*"
+          - Effect: Allow
+            Action:
+              - eks:DescribeCluster
+            Resource: !Sub 'arn:aws:eks:${AWS::Region}:${AWS::AccountId}:cluster/*'
+          - Effect: Allow
+            Action:
+              - sts:GetCallerIdentity
+              - ec2:DescribeInstances
+              - autoscaling:CompleteLifecycleAction
+              - autoscaling:DescribeTags
+            Resource: "*"
+
