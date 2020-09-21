@@ -1,0 +1,87 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: 'eks-node-drainer
+
+  '
+Metadata:
+  AWS::ServerlessRepo::Application:
+    Name: eks-node-drainer
+    Description: Safely drain EKS node during cloudformation updates (autoscaling
+      groups)
+    Author: Chris Williams
+    SpdxLicenseId: MIT
+    LicenseUrl: s3://eks-node-drainer-sar/da6bd1a60b842c289505a3f4330449da
+    ReadmeUrl: s3://eks-node-drainer-sar/27d05bad2a814bfa73bcb9232cfdfc8d
+    Labels:
+    - eks
+    - node
+    - drain
+    HomePageUrl: https://techblog.chrilliams.co.uk/eks-safe-node-draining
+    SemanticVersion: 1.0.0
+    SourceCodeUrl: https://github.com/chrilliams/eks-node-drainer
+Globals:
+  Function:
+    Timeout: 900
+Resources:
+  EKSNodeDrainerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: s3://eks-node-drainer-sar/b6738f5700192b138fc2c2036fa7ee3b
+      Handler: app.lambdaHandler
+      Runtime: nodejs12.x
+      Role:
+        Fn::GetAtt:
+        - EKSNodeDrainerExecutionRole
+        - Arn
+      Events:
+        EKSNodeDrainer:
+          Type: CloudWatchEvent
+          Properties:
+            Pattern:
+              source:
+              - aws.autoscaling
+              detail-type:
+              - EC2 Instance-terminate Lifecycle Action
+  EKSNodeDrainerExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: EKSNodeDrainerExecutionRole
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - lambda.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      Path: /
+  EKSNodeDrainerExecutionPolicy:
+    DependsOn:
+    - EKSNodeDrainerExecutionRole
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: EKSNodeDrainerRolePolicy
+      Roles:
+      - Ref: EKSNodeDrainerExecutionRole
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Action:
+          - logs:CreateLogGroup
+          - logs:CreateLogStream
+          - logs:PutLogEvents
+          Resource: '*'
+        - Effect: Allow
+          Action:
+          - eks:DescribeCluster
+          Resource:
+            Fn::Sub: arn:aws:eks:${AWS::Region}:${AWS::AccountId}:cluster/*
+        - Effect: Allow
+          Action:
+          - sts:GetCallerIdentity
+          - ec2:DescribeInstances
+          - autoscaling:CompleteLifecycleAction
+          - autoscaling:DescribeTags
+          Resource: '*'
