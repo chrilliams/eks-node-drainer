@@ -7,6 +7,7 @@ This project contains source code and supporting files for a serverless applicat
 - drainer/tests - Unit tests for the application code. 
 - template.yaml - A template that defines the application's AWS resources.
 
+For running and the story behind this: [blog post](https://techblog.chrilliams.co.uk/eks-safe-node-draining)
 
 ## Deploy the application
 
@@ -81,6 +82,35 @@ To delete the sample application that you created, use the AWS CLI. Assuming you
 
 ```bash
 aws cloudformation delete-stack --stack-name eks-node-drainer
+```
+
+## Public to Serverless Application Repository
+
+```bash
+aws s3 mb s3://eks-node-drainer-sar
+sam package \                      
+    --template-file template.yaml \
+    --output-template-file packaged.yaml \
+    --s3-bucket eks-node-drainer-sar
+cat >> policy.json << 'END'
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Principal": {
+                "Service":  "serverlessrepo.amazonaws.com"
+            },
+            "Action": "s3:GetObject",
+            "Resource": "arn:aws:s3:::eks-node-drainer-sar/*"
+        }
+    ]
+}
+END
+aws s3api put-bucket-policy --bucket eks-node-drainer-sar --policy file://policy.json
+sam publish \                                                                        
+    --template packaged.yaml \
+    --region eu-west-2
 ```
 
 ## Resources
