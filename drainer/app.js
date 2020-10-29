@@ -14,13 +14,13 @@ const credentialsProvider = new AWS.CredentialProviderChain();
 const { Client, KubeConfig } = require("kubernetes-client");
 const Request = require("kubernetes-client/backends/request");
 
-async function initKubeClient() {
+async function initKubeClient(clusterName) {
   const kubeconfig = new KubeConfig();
 
   if (process.env.NODE_ENV === "inCluster") {
     kubeconfig.loadFromCluster();
   } else {
-    kubeconfig.loadFromString(JSON.stringify(await getKubeConfig("nonprod-1")));
+    kubeconfig.loadFromString(JSON.stringify(await getKubeConfig(clusterName)));
   }
 
   const backend = new Request({ kubeconfig });

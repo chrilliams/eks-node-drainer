@@ -1,8 +1,6 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
-Description: 'eks-node-drainer
-
-  '
+Description: 'eks-node-drainer'
 Metadata:
   AWS::ServerlessRepo::Application:
     Name: eks-node-drainer
@@ -17,7 +15,7 @@ Metadata:
     - node
     - drain
     HomePageUrl: https://techblog.chrilliams.co.uk/eks-safe-node-draining
-    SemanticVersion: 1.0.0
+    SemanticVersion: 1.0.4
     SourceCodeUrl: https://github.com/chrilliams/eks-node-drainer
 Globals:
   Function:
@@ -26,7 +24,7 @@ Resources:
   EKSNodeDrainerFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: s3://eks-node-drainer-sar/b6738f5700192b138fc2c2036fa7ee3b
+      CodeUri: s3://eks-node-drainer-sar/10036abd54882f2fd8280881c0381f6b
       Handler: app.lambdaHandler
       Runtime: nodejs12.x
       Role:
@@ -45,7 +43,6 @@ Resources:
   EKSNodeDrainerExecutionRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: EKSNodeDrainerExecutionRole
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:
@@ -57,8 +54,6 @@ Resources:
           - sts:AssumeRole
       Path: /
   EKSNodeDrainerExecutionPolicy:
-    DependsOn:
-    - EKSNodeDrainerExecutionRole
     Type: AWS::IAM::Policy
     Properties:
       PolicyName: EKSNodeDrainerRolePolicy
@@ -85,3 +80,9 @@ Resources:
           - autoscaling:CompleteLifecycleAction
           - autoscaling:DescribeTags
           Resource: '*'
+Outputs:
+  EKSNodeDrainerExecutionRoleName:
+    Value:
+      Fn::GetAtt:
+      - EKSNodeDrainerExecutionRole
+      - Arn

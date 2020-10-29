@@ -88,8 +88,7 @@ aws cloudformation delete-stack --stack-name eks-node-drainer
 
 ```bash
 aws s3 mb s3://eks-node-drainer-sar
-sam package \                      
-    --template-file template.yaml \
+sam package --template-file template.yaml \
     --output-template-file packaged.yaml \
     --s3-bucket eks-node-drainer-sar
 cat >> policy.json << 'END'
@@ -108,8 +107,7 @@ cat >> policy.json << 'END'
 }
 END
 aws s3api put-bucket-policy --bucket eks-node-drainer-sar --policy file://policy.json
-sam publish \                                                                        
-    --template packaged.yaml \
+sam publish --template packaged.yaml \
     --region eu-west-2
 ```
 

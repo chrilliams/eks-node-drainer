@@ -13,7 +13,7 @@ Metadata:
     ReadmeUrl: README-sar.md
     Labels: ['eks', 'node', 'drain']
     HomePageUrl: https://techblog.chrilliams.co.uk/eks-safe-node-draining
-    SemanticVersion: 1.0.0
+    SemanticVersion: 1.0.4
     SourceCodeUrl: https://github.com/chrilliams/eks-node-drainer
   
 # More info about Globals: https://github.com/awslabs/serverless-application-model/blob/master/docs/globals.rst
@@ -42,7 +42,6 @@ Resources:
   EKSNodeDrainerExecutionRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: EKSNodeDrainerExecutionRole
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:
@@ -55,8 +54,6 @@ Resources:
       Path: "/"
 
   EKSNodeDrainerExecutionPolicy:
-    DependsOn:
-    - EKSNodeDrainerExecutionRole
     Type: AWS::IAM::Policy
     Properties:
       PolicyName: EKSNodeDrainerRolePolicy
@@ -83,3 +80,6 @@ Resources:
               - autoscaling:DescribeTags
             Resource: "*"
 
+Outputs:
+  EKSNodeDrainerExecutionRoleName:
+    Value: !GetAtt EKSNodeDrainerExecutionRole.Arn
