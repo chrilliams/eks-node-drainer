@@ -13,9 +13,19 @@ Metadata:
     ReadmeUrl: README-sar.md
     Labels: ['eks', 'node', 'drain']
     HomePageUrl: https://techblog.chrilliams.co.uk/eks-safe-node-draining
-    SemanticVersion: 1.0.4
+    SemanticVersion: 1.0.5
     SourceCodeUrl: https://github.com/chrilliams/eks-node-drainer
-  
+
+Parameters:
+  SecurityGroup:
+    Type: List<AWS::EC2::SecurityGroup::Id>
+    Description: Security Groups for Node Drainer lambda, this needs access to the Kube API.
+  Subnets:
+    Type: List<AWS::EC2::Subnet::Id>
+    Description: Subnets for Node Drainer lambda
+
+
+
 # More info about Globals: https://github.com/awslabs/serverless-application-model/blob/master/docs/globals.rst
 Globals:
   Function:
@@ -29,6 +39,12 @@ Resources:
       Handler: app.lambdaHandler
       Runtime: nodejs12.x
       Role: !GetAtt EKSNodeDrainerExecutionRole.Arn
+      VpcConfig: 
+        !If 
+          - SecurityGroup
+          - SecurityGroupIds: !Ref SecurityGroup
+            SubnetIds: !Ref Subnets
+          - !Ref 'AWS::NoValue'
       Events:
         EKSNodeDrainer:
           Type: CloudWatchEvent
