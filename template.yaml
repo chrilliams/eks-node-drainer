@@ -13,16 +13,18 @@ Metadata:
     ReadmeUrl: README-sar.md
     Labels: ['eks', 'node', 'drain']
     HomePageUrl: https://techblog.chrilliams.co.uk/eks-safe-node-draining
-    SemanticVersion: 1.0.5
+    SemanticVersion: 1.0.17
     SourceCodeUrl: https://github.com/chrilliams/eks-node-drainer
 
 Parameters:
   SecurityGroup:
-    Type: List<AWS::EC2::SecurityGroup::Id>
-    Description: Security Groups for Node Drainer lambda, this needs access to the Kube API.
-  Subnets:
-    Type: List<AWS::EC2::Subnet::Id>
-    Description: Subnets for Node Drainer lambda
+    Type: String
+    Default: ""
+    Description: Security Group for Node Drainer lambda, this needs access to the Kube API.
+  Subnet:
+    Type: String
+    Default: ""
+    Description: Subnet for Node Drainer lambda
 
 
 
@@ -30,10 +32,13 @@ Parameters:
 Globals:
   Function:
     Timeout: 900 # maximum of 15 minutes
+Conditions:
+  NoVPC: !Equals [!Ref SecurityGroup, ""]
 
 Resources:
   EKSNodeDrainerFunction:
     Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
+    DependsOn: EKSNodeDrainerExecutionPolicy
     Properties:
       CodeUri: drainer/
       Handler: app.lambdaHandler
@@ -41,10 +46,12 @@ Resources:
       Role: !GetAtt EKSNodeDrainerExecutionRole.Arn
       VpcConfig: 
         !If 
-          - SecurityGroup
-          - SecurityGroupIds: !Ref SecurityGroup
-            SubnetIds: !Ref Subnets
-          - !Ref 'AWS::NoValue'
+          - NoVPC
+          - !Ref "AWS::NoValue"
+          - SecurityGroupIds:
+              - !Ref SecurityGroup
+            SubnetIds:
+              - !Ref Subnet
       Events:
         EKSNodeDrainer:
           Type: CloudWatchEvent
@@ -94,6 +101,10 @@ Resources:
               - ec2:DescribeInstances
               - autoscaling:CompleteLifecycleAction
               - autoscaling:DescribeTags
+              - ec2:CreateNetworkInterface
+              - ec2:DeleteNetworkInterface
+              - ec2:DescribeNetworkInterfaces
+              - ec2:DetachNetworkInterface
             Resource: "*"
 
 Outputs:
