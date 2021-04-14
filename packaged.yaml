@@ -17,7 +17,7 @@ Metadata:
     - node
     - drain
     HomePageUrl: https://techblog.chrilliams.co.uk/eks-safe-node-draining
-    SemanticVersion: 1.0.17
+    SemanticVersion: 1.0.18
     SourceCodeUrl: https://github.com/chrilliams/eks-node-drainer
 Parameters:
   SecurityGroup:
@@ -42,7 +42,7 @@ Resources:
     Type: AWS::Serverless::Function
     DependsOn: EKSNodeDrainerExecutionPolicy
     Properties:
-      CodeUri: s3://eks-node-drainer-sar/b99edbdfb742413565724706d7934676
+      CodeUri: s3://eks-node-drainer-sar/e929cbee8535c18b5cca0d4b92e9b59c
       Handler: app.lambdaHandler
       Runtime: nodejs12.x
       Role:

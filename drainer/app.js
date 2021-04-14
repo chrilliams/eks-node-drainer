@@ -169,16 +169,30 @@ async function removeAllPods(client, nodeName) {
           namespace,
         },
       };
-      await client.api.v1
-        .namespaces(namespace)
-        .pods(name)
-        .eviction.post({ body: eviction });
+      evictPod(client, eviction, name, 0);
     })
   );
 }
 
+async function evictPod(client, eviction, name, retry) {
+  try {
+    await client.api.v1
+      .namespaces(namespace)
+      .pods(name)
+      .eviction.post({ body: eviction });
+  } catch (e) {
+    console.log(e);
+    if (retry < 10) {
+      console.log("going to retry in 20 seconds");
+      await new Promise((resolve) => setTimeout(resolve, 20000));
+      evictPod(client, eviction, name);
+      retry = retry + 1;
+    }
+  }
+}
+
 exports.lambdaHandler = async (event, context) => {
-    // get the cluster name from the tag on the autoscaling group
+  // get the cluster name from the tag on the autoscaling group
   const asgTags = await autoscaling
     .describeTags({
       Filters: [
@@ -232,7 +246,7 @@ exports.lambdaHandler = async (event, context) => {
     retries: 20,
   });
 
-  console.log('Complete Lifecycle Action: ' + instanceId)
+  console.log("Complete Lifecycle Action: " + instanceId);
   await completeLifecycleAction(event.detail);
 
   // //console.log(JSON.stringify(res, null, 2));
