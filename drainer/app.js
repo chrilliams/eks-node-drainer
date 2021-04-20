@@ -169,12 +169,21 @@ async function removeAllPods(client, nodeName) {
           namespace,
         },
       };
-      evictPod(client, eviction, name, 0);
+      evictPod(client, eviction, name, namespace, 0);
     })
   );
 }
 
-async function evictPod(client, eviction, name, retry) {
+async function pollUntilAllPodsStable(client, nodeName) {
+  const pods = await podsToEvict(client, nodeName);
+  // Abort retrying if the resource doesn't exist
+  console.log(`still waiting for ${pods.length} pods to be evicted`);
+  if (pods.length > 0) {
+    throw new Error(`still waiting for ${pods.length} pods to be evicted`);
+  }
+}
+
+async function evictPod(client, eviction, name, namespace, retry) {
   try {
     await client.api.v1
       .namespaces(namespace)
@@ -183,9 +192,9 @@ async function evictPod(client, eviction, name, retry) {
   } catch (e) {
     console.log(e);
     if (retry < 10) {
-      console.log("going to retry in 20 seconds");
-      await new Promise((resolve) => setTimeout(resolve, 20000));
-      evictPod(client, eviction, name);
+      console.log(`${name} going to retry in 30 seconds`);
+      await new Promise((resolve) => setTimeout(resolve, 30000));
+      evictPod(client, eviction, namespace, name, retry);
       retry = retry + 1;
     }
   }
@@ -255,7 +264,4 @@ exports.lambdaHandler = async (event, context) => {
     statusCode: 200,
     //  body: JSON.stringify(res.body, null, 2),
   };
-
-  // Use this code if you don't use the http event with the LAMBDA-PROXY integration
-  // return { message: 'Go Serverless v1.0! Your function executed successfully!', event };
 };
