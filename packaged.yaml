@@ -42,7 +42,7 @@ Resources:
     Type: AWS::Serverless::Function
     DependsOn: EKSNodeDrainerExecutionPolicy
     Properties:
-      CodeUri: s3://eks-node-drainer-sar/e929cbee8535c18b5cca0d4b92e9b59c
+      CodeUri: s3://eks-node-drainer-sar/2e082362fe60d22ec8705fb22cffe71c
       Handler: app.lambdaHandler
       Runtime: nodejs12.x
       Role:

@@ -194,7 +194,7 @@ async function evictPod(client, eviction, name, namespace, retry) {
     if (retry < 10) {
       console.log(`${name} going to retry in 30 seconds`);
       await new Promise((resolve) => setTimeout(resolve, 30000));
-      evictPod(client, eviction, namespace, name, retry);
+      evictPod(client, eviction, name, namespace, retry);
       retry = retry + 1;
     }
   }
