@@ -3,12 +3,14 @@ const AWS = require("aws-sdk");
 const EKS = require("aws-sdk/clients/eks");
 const EC2 = require("aws-sdk/clients/ec2");
 const ASG = require("aws-sdk/clients/autoscaling");
+const ELBV2 = require("aws-sdk/clients/elbv2");
 const pRetry = require("p-retry");
 
 const aws4 = require("aws4");
 const eks = new EKS({ region: "eu-west-2" });
-var autoscaling = new ASG();
+const autoscaling = new ASG();
 const ec2 = new EC2();
+const elbv2 = new ELBV2();
 
 const credentialsProvider = new AWS.CredentialProviderChain();
 const { Client, KubeConfig } = require("kubernetes-client");
@@ -242,6 +244,24 @@ exports.lambdaHandler = async (event, context) => {
     };
   }
 
+  // deregister the node from the target groups provided
+  console.log(`target group, ${process.env.targetGroup}`)
+
+  if (process.env.targetGroup){
+    console.log(`target group, ${process.env.targetGroup}`)
+
+
+    var params = {
+      TargetGroupArn: process.env.targetGroup, 
+      Targets: [
+         {
+        Id: instanceId
+       }
+      ]
+     };
+     console.log(await elbv2.deregisterTargets(params).promise());
+  }
+  // arn:aws:elasticloadbalancing:eu-west-2:337889762567:targetgroup/eks-internal-api-nlb-eks-test-tg/d54db6fbdfbcf805
   await cordonNode(kubeClient, nodeName);
 
   await removeAllPods(kubeClient, nodeName);

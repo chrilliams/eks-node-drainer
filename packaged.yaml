@@ -17,7 +17,7 @@ Metadata:
     - node
     - drain
     HomePageUrl: https://techblog.chrilliams.co.uk/eks-safe-node-draining
-    SemanticVersion: 1.0.20
+    SemanticVersion: 1.0.27
     SourceCodeUrl: https://github.com/chrilliams/eks-node-drainer
 Parameters:
   SecurityGroup:
@@ -29,6 +29,10 @@ Parameters:
     Type: String
     Default: ''
     Description: Subnet for Node Drainer lambda
+  TargetGroup:
+    Type: String
+    Default: ''
+    Description: Target group that we will deregister instances
 Globals:
   Function:
     Timeout: 900
@@ -37,18 +41,26 @@ Conditions:
     Fn::Equals:
     - Ref: SecurityGroup
     - ''
+  NoTargetGroup:
+    Fn::Equals:
+    - Ref: TargetGroup
+    - ''
 Resources:
   EKSNodeDrainerFunction:
     Type: AWS::Serverless::Function
     DependsOn: EKSNodeDrainerExecutionPolicy
     Properties:
-      CodeUri: s3://eks-node-drainer-sar/032573a82fca7507f36d28aaf4144077
+      CodeUri: s3://eks-node-drainer-sar/b75b0ea6803610b4890dc1aacdfe967a
       Handler: app.lambdaHandler
       Runtime: nodejs12.x
       Role:
         Fn::GetAtt:
         - EKSNodeDrainerExecutionRole
         - Arn
+      Environment:
+        Variables:
+          targetGroup:
+            Ref: TargetGroup
       VpcConfig:
         Fn::If:
         - NoVPC
@@ -110,6 +122,14 @@ Resources:
           - ec2:DescribeNetworkInterfaces
           - ec2:DetachNetworkInterface
           Resource: '*'
+        - Fn::If:
+          - NoTargetGroup
+          - Ref: AWS::NoValue
+          - Effect: Allow
+            Action:
+            - elasticloadbalancing:DeregisterTargets
+            Resource:
+            - Ref: TargetGroup
 Outputs:
   EKSNodeDrainerExecutionRoleName:
     Value:
