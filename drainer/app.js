@@ -5,6 +5,7 @@ const EC2 = require("aws-sdk/clients/ec2");
 const ASG = require("aws-sdk/clients/autoscaling");
 const ELBV2 = require("aws-sdk/clients/elbv2");
 const pRetry = require("p-retry");
+const Log = require("@dazn/lambda-powertools-logger");
 
 const aws4 = require("aws4");
 const eks = new EKS({ region: "eu-west-2" });
@@ -191,18 +192,20 @@ async function evictPod(client, eviction, name, namespace, retry) {
       .namespaces(namespace)
       .pods(name)
       .eviction.post({ body: eviction });
-  } catch (e) {
-    console.log(e);
-    if (retry < 10) {
-      console.log(`${name} going to retry in 30 seconds`);
-      await new Promise((resolve) => setTimeout(resolve, 30000));
+  } catch (error) {
+    // only retry if the pod exists and we hanve hit the retry limit
+    if (retry < 10 && e.statusCode != 404) {
+      Log.info("unable to evict Pod", {error, namespace, name});
+      await new Promise((resolve) => setTimeout(resolve, 10000));
       evictPod(client, eviction, name, namespace, retry);
       retry = retry + 1;
     }
+    Log.error("unable to evict Pod", {error, namespace, name})
   }
 }
 
 exports.lambdaHandler = async (event, context) => {
+  Log.debug("event", {event});
   // get the cluster name from the tag on the autoscaling group
   const asgTags = await autoscaling
     .describeTags({
@@ -219,9 +222,7 @@ exports.lambdaHandler = async (event, context) => {
   )[0].Key.replace("kubernetes.io/cluster/", "");
 
   console.log("Cluster Name: " + clusterName);
-  //const kubeClient = await getKubeClient("nonprod-1");
   const kubeClient = await initKubeClient(clusterName);
-  //await kubeClient.patchNodeStatus('sdf','{"spec":{"unschedulable":true}}')
 
   const instanceId = event.detail.EC2InstanceId;
   console.log("Instance ID: " + instanceId);
@@ -231,9 +232,10 @@ exports.lambdaHandler = async (event, context) => {
       InstanceIds: [instanceId],
     })
     .promise();
+  Log.debug("response when describing instance", { instances });
 
   const nodeName = instances.Reservations[0].Instances[0].PrivateDnsName;
-  // console.log("nodeName: " + nodeName);
+  Log.debug("found nodename", { nodeName });
 
   //check node exists
   if (await nodeNotExists(kubeClient, nodeName)) {
@@ -245,21 +247,22 @@ exports.lambdaHandler = async (event, context) => {
   }
 
   // deregister the node from the target groups provided
-  console.log(`target group, ${process.env.targetGroup}`)
-
-  if (process.env.targetGroup){
-    console.log(`target group, ${process.env.targetGroup}`)
-
+  if (process.env.targetGroup) {
+    console.log(`target group, ${process.env.targetGroup}`);
 
     var params = {
-      TargetGroupArn: process.env.targetGroup, 
+      TargetGroupArn: process.env.targetGroup,
       Targets: [
-         {
-        Id: instanceId
-       }
-      ]
-     };
-     console.log(await elbv2.deregisterTargets(params).promise());
+        {
+          Id: instanceId,
+        },
+      ],
+    };
+    try {
+      console.log(await elbv2.deregisterTargets(params).promise());
+    } catch (e) {
+      console.log(`deregisterTarget failure: ${e}`);
+    }
   }
   // arn:aws:elasticloadbalancing:eu-west-2:337889762567:targetgroup/eks-internal-api-nlb-eks-test-tg/d54db6fbdfbcf805
   await cordonNode(kubeClient, nodeName);

@@ -10,6 +10,7 @@
     "test": "mocha tests/unit/"
   },
   "dependencies": {
+    "@dazn/lambda-powertools-logger": "^1.28.1",
     "aws-sdk": "^2.903.0",
     "aws4": "^1.11.0",
     "kubernetes-client": "^9.0.0",
