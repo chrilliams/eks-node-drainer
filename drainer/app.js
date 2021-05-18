@@ -194,38 +194,23 @@ async function evictPod(client, eviction, name, namespace, retry) {
       .eviction.post({ body: eviction });
   } catch (error) {
     // only retry if the pod exists and we hanve hit the retry limit
-    if (retry < 10 && e.statusCode != 404) {
-      Log.info("unable to evict Pod", {error, namespace, name});
+    if (retry < 10 && error.statusCode != 404) {
+      Log.info("unable to evict Pod", { error, namespace, name });
       await new Promise((resolve) => setTimeout(resolve, 10000));
       evictPod(client, eviction, name, namespace, retry);
       retry = retry + 1;
     }
-    Log.error("unable to evict Pod", {error, namespace, name})
+    Log.error("unable to evict Pod", { error, namespace, name });
   }
 }
 
 exports.lambdaHandler = async (event, context) => {
-  Log.debug("event", {event});
-  // get the cluster name from the tag on the autoscaling group
-  const asgTags = await autoscaling
-    .describeTags({
-      Filters: [
-        {
-          Name: "auto-scaling-group",
-          Values: [event.detail.AutoScalingGroupName],
-        },
-      ],
-    })
-    .promise();
-  const clusterName = asgTags.Tags.filter((word) =>
-    word.Key.startsWith("kubernetes.io/cluster/")
-  )[0].Key.replace("kubernetes.io/cluster/", "");
 
-  console.log("Cluster Name: " + clusterName);
-  const kubeClient = await initKubeClient(clusterName);
+  // event.detail.EC2InstanceId - instance termination event
+  // event.detail['instance-id'] - spot instance event
+  const instanceId = event.detail.EC2InstanceId || event.detail['instance-id'];
+  Log.debug("event", { event, instanceId });
 
-  const instanceId = event.detail.EC2InstanceId;
-  console.log("Instance ID: " + instanceId);
   // what happens if this doesnt exist
   const instances = await ec2
     .describeInstances({
@@ -235,10 +220,16 @@ exports.lambdaHandler = async (event, context) => {
   Log.debug("response when describing instance", { instances });
 
   const nodeName = instances.Reservations[0].Instances[0].PrivateDnsName;
-  Log.debug("found nodename", { nodeName });
+  const clusterName = instances.Reservations[0].Instances[0].Tags.find(
+    ({ Key }) => (Key === "KubernetesCluster")
+  ).Value;
+
+  Log.info("node and cluster info", {
+    details: { instanceId, nodeName, clusterName },
+  });
 
   //check node exists
-  if (await nodeNotExists(kubeClient, nodeName)) {
+  if (clusterName) {
     // autoscaling event has nothing to do with us as it doesn't exist in the cluster
     return {
       statusCode: 200,
@@ -264,6 +255,9 @@ exports.lambdaHandler = async (event, context) => {
       console.log(`deregisterTarget failure: ${e}`);
     }
   }
+
+  const kubeClient = await initKubeClient(clusterName);
+
   // arn:aws:elasticloadbalancing:eu-west-2:337889762567:targetgroup/eks-internal-api-nlb-eks-test-tg/d54db6fbdfbcf805
   await cordonNode(kubeClient, nodeName);
 
