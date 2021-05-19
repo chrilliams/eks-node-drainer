@@ -228,14 +228,17 @@ exports.lambdaHandler = async (event, context) => {
     details: { instanceId, nodeName, clusterName },
   });
 
+  const kubeClient = await initKubeClient(clusterName);
+
   //check node exists
-  if (clusterName) {
+  if (await nodeNotExists(kubeClient, nodeName)) {
     // autoscaling event has nothing to do with us as it doesn't exist in the cluster
     return {
       statusCode: 200,
       body: "Node does not exist in cluster",
     };
   }
+
 
   // deregister the node from the target groups provided
   if (process.env.targetGroup) {
@@ -256,7 +259,6 @@ exports.lambdaHandler = async (event, context) => {
     }
   }
 
-  const kubeClient = await initKubeClient(clusterName);
 
   // arn:aws:elasticloadbalancing:eu-west-2:337889762567:targetgroup/eks-internal-api-nlb-eks-test-tg/d54db6fbdfbcf805
   await cordonNode(kubeClient, nodeName);
