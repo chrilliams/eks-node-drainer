@@ -77,11 +77,8 @@ async function getBearerToken(name) {
 }
 
 async function completeLifecycleAction(eventDetail) {
-  const {
-    AutoScalingGroupName,
-    LifecycleActionToken,
-    LifecycleHookName,
-  } = eventDetail;
+  const { AutoScalingGroupName, LifecycleActionToken, LifecycleHookName } =
+    eventDetail;
   await autoscaling
     .completeLifecycleAction({
       AutoScalingGroupName,
@@ -135,7 +132,7 @@ async function podsToEvict(client, nodeName) {
   const pods = (
     await client.api.v1.pods.get({
       qs: {
-        fieldSelector: `spec.nodeName=${nodeName},metadata.namespace!=kube-system`,
+        fieldSelector: `spec.nodeName=${nodeName}`,
       },
     })
   ).body.items;
@@ -147,23 +144,19 @@ async function podsToEvict(client, nodeName) {
 async function pollUntilAllPodsRemoved(client, nodeName) {
   const pods = await podsToEvict(client, nodeName);
   // Abort retrying if the resource doesn't exist
-  console.log(`still waiting for ${pods.length} pods to be evicted`);
+  Log.debug("still evicting pods", { remaining: pods.length });
   if (pods.length > 0) {
     throw new Error(`still waiting for ${pods.length} pods to be evicted`);
   }
 }
 async function removeAllPods(client, nodeName) {
   //"""Removes all Kubernetes pods from the specified node."""
-  //pods = get_evictable_pods(client, nodeName)
-
   const pods = await podsToEvict(client, nodeName);
   await Promise.all(
     pods.map(async (pod) => {
       // we need to use the eviction api
       const namespace = pod.metadata.namespace;
       const name = pod.metadata.name;
-      console.log(`attempting to evict: ${name}`);
-      //console.log(await client.api.v1.namespaces(namespace).pods(name).get());
       const eviction = {
         apiVersion: "policy/v1beta1",
         kind: "Eviction",
@@ -172,22 +165,14 @@ async function removeAllPods(client, nodeName) {
           namespace,
         },
       };
-      evictPod(client, eviction, name, namespace, 0);
+      await evictPod(client, eviction, name, namespace, 0);
     })
   );
 }
 
-async function pollUntilAllPodsStable(client, nodeName) {
-  const pods = await podsToEvict(client, nodeName);
-  // Abort retrying if the resource doesn't exist
-  console.log(`still waiting for ${pods.length} pods to be evicted`);
-  if (pods.length > 0) {
-    throw new Error(`still waiting for ${pods.length} pods to be evicted`);
-  }
-}
-
 async function evictPod(client, eviction, name, namespace, retry) {
   try {
+    Log.debug("attempting to evict", { eviction, name, namespace, retry });
     await client.api.v1
       .namespaces(namespace)
       .pods(name)
@@ -197,7 +182,7 @@ async function evictPod(client, eviction, name, namespace, retry) {
     if (retry < 10 && error.statusCode != 404) {
       Log.info("unable to evict Pod", { error, namespace, name });
       await new Promise((resolve) => setTimeout(resolve, 10000));
-      evictPod(client, eviction, name, namespace, retry);
+      await evictPod(client, eviction, name, namespace, retry);
       retry = retry + 1;
     }
     Log.error("unable to evict Pod", { error, namespace, name });
@@ -205,10 +190,9 @@ async function evictPod(client, eviction, name, namespace, retry) {
 }
 
 exports.lambdaHandler = async (event, context) => {
-
   // event.detail.EC2InstanceId - instance termination event
   // event.detail['instance-id'] - spot instance event
-  const instanceId = event.detail.EC2InstanceId || event.detail['instance-id'];
+  const instanceId = event.detail.EC2InstanceId || event.detail["instance-id"];
   Log.debug("event", { event, instanceId });
 
   // what happens if this doesnt exist
@@ -221,7 +205,7 @@ exports.lambdaHandler = async (event, context) => {
 
   const nodeName = instances.Reservations[0].Instances[0].PrivateDnsName;
   const clusterName = instances.Reservations[0].Instances[0].Tags.find(
-    ({ Key }) => (Key === "KubernetesCluster")
+    ({ Key }) => Key === "KubernetesCluster"
   ).Value;
 
   Log.info("node and cluster info", {
@@ -239,11 +223,8 @@ exports.lambdaHandler = async (event, context) => {
     };
   }
 
-
   // deregister the node from the target groups provided
   if (process.env.targetGroup) {
-    console.log(`target group, ${process.env.targetGroup}`);
-
     var params = {
       TargetGroupArn: process.env.targetGroup,
       Targets: [
@@ -253,34 +234,56 @@ exports.lambdaHandler = async (event, context) => {
       ],
     };
     try {
-      console.log(await elbv2.deregisterTargets(params).promise());
+      const response = await elbv2.deregisterTargets(params).promise();
+      Log.info("deregisterTarget", {
+        details: {
+          instanceId,
+          nodeName,
+          clusterName,
+          targetGroupArn: process.env.targetGroup,
+          response,
+        },
+      });
     } catch (e) {
-      console.log(`deregisterTarget failure: ${e}`);
+      Log.error("deregisterTarget failed", {
+        details: {
+          instanceId,
+          nodeName,
+          clusterName,
+          TargetGroupArn: process.env.targetGroup,
+        },
+      });
     }
   }
 
-
-  // arn:aws:elasticloadbalancing:eu-west-2:337889762567:targetgroup/eks-internal-api-nlb-eks-test-tg/d54db6fbdfbcf805
   await cordonNode(kubeClient, nodeName);
 
   await removeAllPods(kubeClient, nodeName);
 
   await pRetry(() => pollUntilAllPodsRemoved(kubeClient, nodeName), {
     onFailedAttempt: (error) => {
-      console.log(
-        `attempt ${error.attemptNumber} failed. There are ${error.retriesLeft} retries left.`
-      );
+      Log.debug("pollUntilAllPodsRemovedFailed", {
+        details: {
+          instanceId,
+          nodeName,
+          clusterName,
+          attempt: error.attemptNumber,
+          retriesLeft: error.retriesLeft,
+        },
+      });
     },
     retries: 20,
   });
 
-  console.log("Complete Lifecycle Action: " + instanceId);
-  await completeLifecycleAction(event.detail);
-
-  // //console.log(JSON.stringify(res, null, 2));
+  try {
+    Log.info("Complete Lifecycle Action", { instanceId });
+    await completeLifecycleAction(event.detail);
+  } catch (error) {
+    // check to see if its retryable
+    Log.error('Complete Lifecycle Action', {error})
+  }
 
   return {
     statusCode: 200,
-    //  body: JSON.stringify(res.body, null, 2),
   };
 };
