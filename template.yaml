@@ -122,6 +122,7 @@ Resources:
               - sts:GetCallerIdentity
               - ec2:DescribeInstances
               - autoscaling:CompleteLifecycleAction
+              - autoscaling:TerminateInstanceInAutoScalingGroup
               - ec2:CreateNetworkInterface
               - ec2:DeleteNetworkInterface
               - ec2:DescribeNetworkInterfaces
