@@ -17,7 +17,7 @@ Metadata:
     - node
     - drain
     HomePageUrl: https://techblog.chrilliams.co.uk/eks-safe-node-draining
-    SemanticVersion: 1.2.3
+    SemanticVersion: 1.2.4
     SourceCodeUrl: https://github.com/chrilliams/eks-node-drainer
 Parameters:
   SecurityGroup:
