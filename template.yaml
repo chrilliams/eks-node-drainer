@@ -13,7 +13,7 @@ Metadata:
     ReadmeUrl: README-sar.md
     Labels: ['eks', 'node', 'drain']
     HomePageUrl: https://techblog.chrilliams.co.uk/eks-safe-node-draining
-    SemanticVersion: 1.2.4
+    SemanticVersion: 1.3.0
     SourceCodeUrl: https://github.com/chrilliams/eks-node-drainer
 
 Parameters:
@@ -46,7 +46,7 @@ Resources:
     Properties:
       CodeUri: drainer/
       Handler: app.lambdaHandler
-      Runtime: nodejs12.x
+      Runtime: nodejs16.x
       Role: !GetAtt EKSNodeDrainerExecutionRole.Arn
       Environment:
         Variables:
