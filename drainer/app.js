@@ -190,11 +190,11 @@ async function evictPod(client, eviction, name, namespace, retry) {
 }
 
 exports.lambdaHandler = async (event, context) => {
-  Log.debug("event", { event, instanceId });
-
   // event.detail.EC2InstanceId - instance termination event
   // event.detail['instance-id'] - spot instance event
   const instanceId = event.detail.EC2InstanceId || event.detail["instance-id"];
+  Log.debug("event", { event });
+  Log.info("instanceId", { instanceId });
 
   // we can only continue with draining nodes if there is a lifecycle event
   // this is because we rely on AWS to correctly shutdown the node when the Lifecycle event successfully completes
